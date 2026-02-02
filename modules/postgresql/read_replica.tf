@@ -32,7 +32,7 @@ resource "google_sql_database_instance" "replicas" {
   for_each             = local.replicas
   project              = var.project_id
   name                 = each.value.name_override == null || each.value.name_override == "" ? "${local.instance_name}-replica${var.read_replica_name_suffix}${each.value.name}" : each.value.name_override
-  database_version     = var.database_version
+  database_version     = can(regex("\\d", substr(var.database_version, 0, 1))) ? format("POSTGRES_%s", var.database_version) : replace(var.database_version, substr(var.database_version, 0, 8), "POSTGRES")
   region               = join("-", slice(split("-", lookup(each.value, "zone", null) != null ? lookup(each.value, "zone", null) : local.zone), 0, 2))
   master_instance_name = google_sql_database_instance.default.name
   deletion_protection  = var.read_replica_deletion_protection
@@ -46,13 +46,16 @@ resource "google_sql_database_instance" "replicas" {
     deletion_protection_enabled = var.read_replica_deletion_protection_enabled
 
     dynamic "ip_configuration" {
-      for_each = [lookup(each.value, "ip_configuration", {})]
+      for_each = [lookup(each.value, "ip_configuration", null) != null ? lookup(each.value, "ip_configuration", null) : var.ip_configuration]
       content {
         ipv4_enabled                                  = lookup(ip_configuration.value, "ipv4_enabled", null)
         private_network                               = lookup(ip_configuration.value, "private_network", null)
         ssl_mode                                      = lookup(ip_configuration.value, "ssl_mode", null)
         allocated_ip_range                            = lookup(ip_configuration.value, "allocated_ip_range", null)
         enable_private_path_for_google_cloud_services = lookup(ip_configuration.value, "enable_private_path_for_google_cloud_services", false)
+        server_ca_mode                                = lookup(ip_configuration.value, "server_ca_mode", null)
+        server_ca_pool                                = lookup(ip_configuration.value, "server_ca_pool", null)
+        custom_subject_alternative_names              = lookup(ip_configuration.value, "custom_subject_alternative_names", [])
 
         dynamic "authorized_networks" {
           for_each = lookup(ip_configuration.value, "authorized_networks", [])
@@ -107,7 +110,7 @@ resource "google_sql_database_instance" "replicas" {
     user_labels           = lookup(each.value, "user_labels", var.user_labels)
 
     dynamic "connection_pool_config" {
-      for_each = var.connection_pool_config != null ? [var.connection_pool_config] : []
+      for_each = lookup(each.value, "connection_pool_config", null) != null ? [lookup(each.value, "connection_pool_config", null)] : var.connection_pool_config != null ? [var.connection_pool_config] : []
       content {
         connection_pooling_enabled = var.connection_pool_config.enabled
         dynamic "flags" {
@@ -121,7 +124,7 @@ resource "google_sql_database_instance" "replicas" {
     }
 
     dynamic "database_flags" {
-      for_each = lookup(each.value, "database_flags", [])
+      for_each = lookup(each.value, "database_flags", []) != null ? lookup(each.value, "database_flags", null) : var.database_flags
       content {
         name  = lookup(database_flags.value, "name", null)
         value = lookup(database_flags.value, "value", null)

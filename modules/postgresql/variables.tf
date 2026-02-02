@@ -364,7 +364,7 @@ variable "read_replicas" {
     disk_autoresize       = optional(bool)
     disk_autoresize_limit = optional(number)
     disk_size             = optional(string)
-    user_labels           = map(string)
+    user_labels           = optional(map(string))
     connection_pool_config = optional(object({
       enabled = optional(bool, false)
       flags = optional(list(object({
@@ -375,7 +375,7 @@ variable "read_replicas" {
     database_flags = optional(list(object({
       name  = string
       value = string
-    })), [])
+    })))
     insights_config = optional(object({
       query_plans_per_minute  = optional(number, 5)
       query_string_length     = optional(number, 1024)
@@ -386,7 +386,7 @@ variable "read_replicas" {
       enabled        = optional(bool, false)
       retention_days = optional(number, 1)
     }), null)
-    ip_configuration = object({
+    ip_configuration = optional(object({
       authorized_networks                           = optional(list(map(string)), [])
       ipv4_enabled                                  = optional(bool)
       private_network                               = optional(string)
@@ -399,7 +399,10 @@ variable "read_replicas" {
         consumer_network            = string
         consumer_service_project_id = string
       })))
-    })
+      server_ca_mode                   = optional(string)
+      server_ca_pool                   = optional(string)
+      custom_subject_alternative_names = optional(list(string), [])
+    }))
     encryption_key_name = optional(string)
     data_cache_enabled  = optional(bool)
   }))
