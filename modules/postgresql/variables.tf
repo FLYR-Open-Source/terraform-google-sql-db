@@ -352,14 +352,28 @@ variable "ip_configuration" {
 
 // Read Replicas
 variable "read_replicas" {
-  description = "List of read replicas to create. Encryption key is required for replica in different region. For replica in same region as master set encryption_key_name = null"
+  description = "List of read replicas to create. Encryption key is required for replica in different region. For replica in same region as master set encryption_key_name = null. Instance type can be either READ_REPLICA_INSTANCE or READ_POOL_INSTANCE."
   type = list(object({
-    name                  = string
-    name_override         = optional(string)
-    tier                  = optional(string)
-    edition               = optional(string)
-    availability_type     = optional(string)
-    zone                  = optional(string)
+    name              = string
+    name_override     = optional(string)
+    tier              = optional(string)
+    edition           = optional(string)
+    availability_type = optional(string)
+    zone              = optional(string)
+    instance_type     = optional(string, "READ_REPLICA_INSTANCE")
+    node_count        = optional(number, 2)
+    read_pool_auto_scale_config = optional(object({
+      enabled                    = optional(bool, true)
+      min_node_count             = number
+      max_node_count             = number
+      disable_scale_in           = optional(bool)
+      scale_in_cooldown_seconds  = optional(number)
+      scale_out_cooldown_seconds = optional(number)
+      target_metrics = optional(list(object({
+        metric       = string
+        target_value = number
+      })), [{ metric = "AVERAGE_CPU_UTILIZATION", target_value = 0.6 }])
+    }), null)
     disk_type             = optional(string)
     disk_autoresize       = optional(bool)
     disk_autoresize_limit = optional(number)
