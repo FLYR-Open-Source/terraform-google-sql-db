@@ -19,7 +19,14 @@ locals {
     for x in var.read_replicas : "${var.name}-replica${var.read_replica_name_suffix}${x.name}" => x
   }
   // Zone for replica instances
-  zone = var.zone == null ? data.google_compute_zones.available.names[0] : var.zone
+  filtered_zones        = [for name in data.google_compute_zones.available.names : name if !strcontains(name, "-ai")]
+  first_read_zone       = tolist(setsubtract(local.filtered_zones, [google_sql_database_instance.default.settings[0].location_preference[0].zone, google_sql_database_instance.default.settings[0].location_preference[0].secondary_zone]))[0]
+  first_read_zone_index = index(local.filtered_zones, local.first_read_zone)
+  replica_zones = {
+    for i, x in var.read_replicas : "${var.name}-replica${var.read_replica_name_suffix}${x.name}" => {
+      zone = lookup(x, "zone", null) != null ? lookup(x, "zone", null) : local.filtered_zones[(local.first_read_zone_index + i) % length(local.filtered_zones)]
+    }
+  }
 }
 
 data "google_compute_zones" "available" {
@@ -33,10 +40,10 @@ resource "google_sql_database_instance" "replicas" {
   project              = var.project_id
   name                 = each.value.name_override == null || each.value.name_override == "" ? "${local.instance_name}-replica${var.read_replica_name_suffix}${each.value.name}" : each.value.name_override
   database_version     = can(regex("\\d", substr(var.database_version, 0, 1))) ? format("POSTGRES_%s", var.database_version) : replace(var.database_version, substr(var.database_version, 0, 8), "POSTGRES")
-  region               = join("-", slice(split("-", lookup(each.value, "zone", null) != null ? lookup(each.value, "zone", null) : local.zone), 0, 2))
+  region               = join("-", slice(split("-", local.replica_zones[each.key].zone), 0, 2))
   master_instance_name = google_sql_database_instance.default.name
   deletion_protection  = var.read_replica_deletion_protection
-  encryption_key_name  = (join("-", slice(split("-", lookup(each.value, "zone", null) != null ? lookup(each.value, "zone", null) : local.zone), 0, 2))) == var.region ? null : each.value.encryption_key_name
+  encryption_key_name  = (join("-", slice(split("-", local.replica_zones[each.key].zone), 0, 2))) == var.region ? null : each.value.encryption_key_name
 
   settings {
     tier                        = lookup(each.value, "tier", null) == null ? var.tier : lookup(each.value, "tier", null)
@@ -132,7 +139,7 @@ resource "google_sql_database_instance" "replicas" {
     }
 
     location_preference {
-      zone = lookup(each.value, "zone", null) != null ? lookup(each.value, "zone", null) : local.zone
+      zone = local.replica_zones[each.key].zone
     }
 
     dynamic "data_cache_config" {
