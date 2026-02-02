@@ -44,6 +44,8 @@ resource "google_sql_database_instance" "replicas" {
   master_instance_name = google_sql_database_instance.default.name
   deletion_protection  = var.read_replica_deletion_protection
   encryption_key_name  = (join("-", slice(split("-", local.replica_zones[each.key].zone), 0, 2))) == var.region ? null : each.value.encryption_key_name
+  node_count           = each.value.instance_type == "READ_REPLICA_INSTANCE" || lookup(each.value, "read_pool_auto_scale_config", null) != null ? null : each.value.node_count
+  instance_type        = each.value.instance_type
 
   settings {
     tier                        = lookup(each.value, "tier", null) == null ? var.tier : lookup(each.value, "tier", null)
@@ -138,8 +140,11 @@ resource "google_sql_database_instance" "replicas" {
       }
     }
 
-    location_preference {
-      zone = local.replica_zones[each.key].zone
+    dynamic "location_preference" {
+      for_each = each.value.instance_type == "READ_REPLICA_INSTANCE" ? [local.replica_zones[each.key]] : []
+      content {
+        zone = location_preference.value.zone
+      }
     }
 
     dynamic "data_cache_config" {
@@ -148,7 +153,25 @@ resource "google_sql_database_instance" "replicas" {
         data_cache_enabled = lookup(each.value, "data_cache_enabled", var.data_cache_enabled)
       }
     }
+  }
 
+  dynamic "read_pool_auto_scale_config" {
+    for_each = each.value.instance_type == "READ_POOL_INSTANCE" && lookup(each.value, "read_pool_auto_scale_config", null) != null ? [lookup(each.value, "read_pool_auto_scale_config", null)] : []
+    content {
+      enabled                    = read_pool_auto_scale_config.value.enabled
+      min_node_count             = read_pool_auto_scale_config.value.min_node_count
+      max_node_count             = read_pool_auto_scale_config.value.max_node_count
+      scale_in_cooldown_seconds  = read_pool_auto_scale_config.value.scale_in_cooldown_seconds
+      scale_out_cooldown_seconds = read_pool_auto_scale_config.value.scale_out_cooldown_seconds
+
+      dynamic "target_metrics" {
+        for_each = read_pool_auto_scale_config.value.target_metrics != null ? read_pool_auto_scale_config.value.target_metrics : []
+        content {
+          metric       = target_metrics.value.metric
+          target_value = target_metrics.value.target_value
+        }
+      }
+    }
   }
 
   depends_on = [google_sql_database_instance.default]
