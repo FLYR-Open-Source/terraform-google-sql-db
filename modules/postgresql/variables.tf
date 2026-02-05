@@ -89,9 +89,37 @@ variable "user_password" {
   default     = ""
 }
 
+variable "user_password_wo" {
+  description = "The write only password for the default user. If not set, a random one will be generated and available in the generated_user_password output variable."
+  type        = string
+  default     = null
+  sensitive   = true
+  ephemeral   = true
+}
+
+variable "user_password_wo_version" {
+  description = "The write only password version for the default user. If not set, a random one will be generated and available in the generated_user_password output variable."
+  type        = number
+  default     = null
+}
+
 variable "root_password" {
   description = "Initial root password during creation"
   type        = string
+  default     = null
+}
+
+variable "root_password_wo" {
+  description = "Initial write only root password during creation"
+  type        = string
+  default     = null
+  sensitive   = true
+  ephemeral   = true
+}
+
+variable "root_password_wo_version" {
+  description = "Initial write only root password version during creation"
+  type        = number
   default     = null
 }
 
@@ -348,6 +376,12 @@ variable "ip_configuration" {
     custom_subject_alternative_names = optional(list(string), [])
   })
   default = {}
+}
+
+variable "additional_replica_names" {
+  description = "List of read replica instance names to add as replicas to the instance. This is mostly used to perform an Advanced Disaster Recovery switchover."
+  type        = list(string)
+  default     = []
 }
 
 // Read Replicas

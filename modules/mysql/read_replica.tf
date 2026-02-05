@@ -104,8 +104,8 @@ resource "google_sql_database_instance" "replicas" {
             dynamic "psc_auto_connections" {
               for_each = ip_configuration.value.psc_auto_connections != null ? ip_configuration.value.psc_auto_connections : []
               content {
-                consumer_network             = psc_auto_connections.value.consumer_network
-                consumer_service_project_id  = psc_auto_connections.value.consumer_service_project_id
+                consumer_network            = psc_auto_connections.value.consumer_network
+                consumer_service_project_id = psc_auto_connections.value.consumer_service_project_id
               }
             }
           }

@@ -56,6 +56,16 @@ output "instance_server_ca_cert" {
   sensitive   = true
 }
 
+output "dns_names" {
+  description = "DNS names of the instance"
+  value       = google_sql_database_instance.default.dns_names
+}
+
+output "psa_write_endpoint" {
+  description = "The private service access write endpoint for the master instance"
+  value       = google_sql_database_instance.default.replication_cluster[0].psa_write_endpoint
+}
+
 output "instance_service_account_email_address" {
   value       = google_sql_database_instance.default.service_account_email_address
   description = "The service account email address assigned to the master instance"
@@ -64,6 +74,13 @@ output "instance_service_account_email_address" {
 output "instance_psc_attachment" {
   value       = google_sql_database_instance.default.psc_service_attachment_link
   description = "The psc_service_attachment_link created for the master instance"
+}
+
+output "instance_psc_auto_connections" {
+  value = flatten([
+    for psc_config in google_sql_database_instance.default.settings[0].ip_configuration[0].psc_config : psc_config.psc_auto_connections
+  ])
+  description = "The psc_auto_connections created for the master instance"
 }
 
 // Replicas
@@ -91,6 +108,15 @@ output "replicas_instance_server_ca_certs" {
 output "replicas_instance_psc_attachments" {
   value       = [for r in google_sql_database_instance.replicas : r.psc_service_attachment_link]
   description = "The psc_service_attachment_links created for the replica instances"
+}
+
+output "replicas_instance_psc_auto_connections" {
+  value = {
+    for instance in google_sql_database_instance.replicas : instance.name => flatten([
+      for psc_config in instance.settings[0].ip_configuration[0].psc_config : psc_config.psc_auto_connections
+    ])
+  }
+  description = "The psc_auto_connections created for the replica instances"
 }
 
 output "replicas_instance_service_account_email_addresses" {
@@ -153,6 +179,13 @@ output "instances" {
 output "dns_name" {
   value       = google_sql_database_instance.default.dns_name
   description = "DNS name of the instance endpoint"
+}
+
+output "replicas_instance_dns_names" {
+  description = "Map of replica instance name to DNS names of the replica instances"
+  value = {
+    for instance in google_sql_database_instance.replicas : instance.name => instance.dns_names
+  }
 }
 
 output "env_vars" {

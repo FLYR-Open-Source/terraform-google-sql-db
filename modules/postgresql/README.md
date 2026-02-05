@@ -118,6 +118,7 @@ module "pg" {
 |------|-------------|------|---------|:--------:|
 | activation\_policy | The activation policy for the Cloud SQL instance.Can be either `ALWAYS`, `NEVER` or `ON_DEMAND`. | `string` | `"ALWAYS"` | no |
 | additional\_databases | A list of databases to be created in your cluster | <pre>list(object({<br>    name      = string<br>    charset   = string<br>    collation = string<br>  }))</pre> | `[]` | no |
+| additional\_replica\_names | List of read replica instance names to add as replicas to the instance. This is mostly used to perform an Advanced Disaster Recovery switchover. | `list(string)` | `[]` | no |
 | additional\_users | A list of users to be created in your cluster. A random password would be set for the user if the `random_password` variable is set. | <pre>list(object({<br>    name            = string<br>    password        = string<br>    random_password = bool<br>  }))</pre> | `[]` | no |
 | availability\_type | The availability type for the Cloud SQL instance.This is only used to set up high availability for the PostgreSQL instance. Can be either `ZONAL` or `REGIONAL`. | `string` | `"ZONAL"` | no |
 | backup\_configuration | The backup\_configuration settings subblock for the database settings | <pre>object({<br>    enabled                        = optional(bool, false)<br>    start_time                     = optional(string)<br>    location                       = optional(string)<br>    point_in_time_recovery_enabled = optional(bool, false)<br>    transaction_log_retention_days = optional(string)<br>    retained_backups               = optional(number)<br>    retention_unit                 = optional(string)<br>  })</pre> | `{}` | no |
@@ -174,6 +175,8 @@ module "pg" {
 | region | The region of the Cloud SQL resources | `string` | `"us-central1"` | no |
 | retain\_backups\_on\_delete | When this parameter is set to true, Cloud SQL retains backups of the instance even after the instance is deleted. The ON\_DEMAND backup will be retained until customer deletes the backup or the project. The AUTOMATED backup will be retained based on the backups retention setting. | `bool` | `false` | no |
 | root\_password | Initial root password during creation | `string` | `null` | no |
+| root\_password\_wo | Initial write only root password during creation | `string` | `null` | no |
+| root\_password\_wo\_version | Initial write only root password version during creation | `number` | `null` | no |
 | secondary\_zone | The preferred zone for the replica instance, it should be something like: `us-central1-a`, `us-east1-c`. | `string` | `null` | no |
 | tier | The tier for the Cloud SQL instance, for ADC its default value will be db-perf-optimized-N-8 which is tier value for edition ENTERPRISE\_PLUS, if user wants to change the edition, he should chose compatible tier. | `string` | `"db-f1-micro"` | no |
 | update\_timeout | The optional timout that is applied to limit long database updates. | `string` | `"30m"` | no |
@@ -182,6 +185,8 @@ module "pg" {
 | user\_labels | The key/value labels for the Cloud SQL instances. | `map(string)` | `{}` | no |
 | user\_name | The name of the default user | `string` | `"default"` | no |
 | user\_password | The password for the default user. If not set, a random one will be generated and available in the generated\_user\_password output variable. | `string` | `""` | no |
+| user\_password\_wo | The write only password for the default user. If not set, a random one will be generated and available in the generated\_user\_password output variable. | `string` | `null` | no |
+| user\_password\_wo\_version | The write only password version for the default user. If not set, a random one will be generated and available in the generated\_user\_password output variable. | `number` | `null` | no |
 | zone | The zone for the Cloud SQL instance, it should be something like: `us-central1-a`, `us-east1-c`. | `string` | `null` | no |
 
 ## Outputs
@@ -192,6 +197,7 @@ module "pg" {
 | additional\_users | List of maps of additional users and passwords |
 | apphub\_service\_uri | Service URI in CAIS style to be used by Apphub. |
 | dns\_name | DNS name of the instance endpoint |
+| dns\_names | DNS names of the instance |
 | env\_vars | Exported environment variables |
 | generated\_user\_password | The auto generated default user password if not input password was provided |
 | iam\_users | The list of the IAM users with access to the CloudSQL instance |
@@ -200,18 +206,22 @@ module "pg" {
 | instance\_ip\_address | The IPv4 address assigned for the master instance |
 | instance\_name | The instance name for the master instance |
 | instance\_psc\_attachment | The psc\_service\_attachment\_link created for the master instance |
+| instance\_psc\_auto\_connections | The psc\_auto\_connections created for the master instance |
 | instance\_self\_link | The URI of the master instance |
 | instance\_server\_ca\_cert | The CA certificate information used to connect to the SQL instance via SSL |
 | instance\_service\_account\_email\_address | The service account email address assigned to the master instance |
 | instances | A list of all `google_sql_database_instance` resources we've created |
 | primary | The `google_sql_database_instance` resource representing the primary instance |
 | private\_ip\_address | The first private (PRIVATE) IPv4 address assigned for the master instance |
+| psa\_write\_endpoint | The private service access write endpoint for the master instance |
 | public\_ip\_address | The first public (PRIMARY) IPv4 address assigned for the master instance |
 | read\_replica\_instance\_names | The instance names for the read replica instances |
 | replicas | A list of `google_sql_database_instance` resources representing the replicas |
 | replicas\_instance\_connection\_names | The connection names of the replica instances to be used in connection strings |
+| replicas\_instance\_dns\_names | Map of replica instance name to DNS names of the replica instances |
 | replicas\_instance\_first\_ip\_addresses | The first IPv4 addresses of the addresses assigned for the replica instances |
 | replicas\_instance\_psc\_attachments | The psc\_service\_attachment\_links created for the replica instances |
+| replicas\_instance\_psc\_auto\_connections | The psc\_auto\_connections created for the replica instances |
 | replicas\_instance\_self\_links | The URIs of the replica instances |
 | replicas\_instance\_server\_ca\_certs | The CA certificates information used to connect to the replica instances via SSL |
 | replicas\_instance\_service\_account\_email\_addresses | The service account email addresses assigned to the replica instances |
