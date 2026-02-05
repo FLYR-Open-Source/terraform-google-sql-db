@@ -47,6 +47,14 @@ locals {
   database_name = var.enable_default_db ? var.db_name : (length(var.additional_databases) > 0 ? var.additional_databases[0].name : "")
 
   encryption_key = var.encryption_key_name != null ? var.encryption_key_name : var.use_autokey ? try(google_kms_key_handle.default[0].kms_key, data.google_kms_key_handle.key_handle[0].kms_key, null) : null
+
+  failover_dr_replica_parts = var.failover_dr_replica_name != null ? split(":", var.failover_dr_replica_name) : []
+
+  replica_names = distinct(compact(concat(
+    [for replica in local.replicas : replica.name],
+    var.additional_replica_names,
+    local.is_secondary_instance || var.failover_dr_replica_name == null ? [] : [length(local.failover_dr_replica_parts) > 1 ? local.failover_dr_replica_parts[1] : local.failover_dr_replica_parts[0]]
+  )))
 }
 
 resource "random_id" "suffix" {
@@ -56,18 +64,22 @@ resource "random_id" "suffix" {
 }
 
 resource "google_sql_database_instance" "default" {
-  provider            = google-beta
-  project             = var.project_id
-  name                = local.instance_name
-  database_version    = can(regex("\\d", substr(var.database_version, 0, 1))) ? format("POSTGRES_%s", var.database_version) : replace(var.database_version, substr(var.database_version, 0, 8), "POSTGRES")
-  maintenance_version = var.maintenance_version
-  region              = var.region
-  encryption_key_name = local.encryption_key
-  deletion_protection = var.deletion_protection
-  root_password       = var.root_password
+  provider                 = google-beta
+  project                  = var.project_id
+  name                     = local.instance_name
+  database_version         = can(regex("\\d", substr(var.database_version, 0, 1))) ? format("POSTGRES_%s", var.database_version) : replace(var.database_version, substr(var.database_version, 0, 8), "POSTGRES")
+  maintenance_version      = var.maintenance_version
+  region                   = var.region
+  encryption_key_name      = local.encryption_key
+  deletion_protection      = var.deletion_protection
+  root_password            = var.root_password
+  root_password_wo         = var.root_password_wo
+  root_password_wo_version = var.root_password_wo_version
 
   master_instance_name = var.master_instance_name
   instance_type        = local.is_secondary_instance ? "READ_REPLICA_INSTANCE" : var.instance_type
+
+  replica_names = local.replica_names
 
   dynamic "replication_cluster" {
     for_each = var.failover_dr_replica_name != null ? [var.failover_dr_replica_name] : []
@@ -223,7 +235,7 @@ resource "google_sql_database_instance" "default" {
       for_each = var.zone != null ? ["location_preference"] : []
       content {
         zone                   = var.zone
-        secondary_zone         = local.is_secondary_instance ? null : var.secondary_zone
+        secondary_zone         = var.secondary_zone
         follow_gae_application = local.is_secondary_instance ? null : var.follow_gae_application
       }
     }
@@ -293,7 +305,7 @@ resource "google_sql_database" "additional_databases" {
 }
 
 resource "random_password" "user-password" {
-  count = var.enable_default_user ? 1 : 0
+  count = var.enable_default_user && var.user_password == "" ? 1 : 0
   keepers = {
     name = google_sql_database_instance.default.name
   }
@@ -334,11 +346,13 @@ resource "random_password" "additional_passwords" {
 }
 
 resource "google_sql_user" "default" {
-  count    = var.enable_default_user ? 1 : 0
-  name     = var.user_name
-  project  = var.project_id
-  instance = google_sql_database_instance.default.name
-  password = var.user_password == "" ? random_password.user-password[0].result : var.user_password
+  count               = var.enable_default_user ? 1 : 0
+  name                = var.user_name
+  project             = var.project_id
+  instance            = google_sql_database_instance.default.name
+  password            = var.user_password == "" ? random_password.user-password[0].result : var.user_password
+  password_wo         = var.user_password == null ? var.user_password_wo : null
+  password_wo_version = var.user_password == null ? var.user_password_wo_version : null
   depends_on = [
     null_resource.module_depends_on,
     google_sql_database_instance.default,

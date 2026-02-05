@@ -16,7 +16,9 @@
 
 locals {
   replicas = {
-    for x in var.read_replicas : "${var.name}-replica${var.read_replica_name_suffix}${x.name}" => x
+    for x in var.read_replicas : "${var.name}-replica${var.read_replica_name_suffix}${x.name}" => merge(x, {
+      name = x.name_override == null || x.name_override == "" ? "${local.instance_name}-replica${var.read_replica_name_suffix}${x.name}" : x.name_override
+    })
   }
   // Zone for replica instances
   filtered_zones        = [for name in data.google_compute_zones.available.names : name if !strcontains(name, "-ai")]
@@ -38,7 +40,7 @@ resource "google_sql_database_instance" "replicas" {
   provider             = google-beta
   for_each             = local.replicas
   project              = var.project_id
-  name                 = each.value.name_override == null || each.value.name_override == "" ? "${local.instance_name}-replica${var.read_replica_name_suffix}${each.value.name}" : each.value.name_override
+  name                 = each.value.name
   database_version     = can(regex("\\d", substr(var.database_version, 0, 1))) ? format("POSTGRES_%s", var.database_version) : replace(var.database_version, substr(var.database_version, 0, 8), "POSTGRES")
   region               = join("-", slice(split("-", local.replica_zones[each.key].zone), 0, 2))
   master_instance_name = google_sql_database_instance.default.name
@@ -148,7 +150,7 @@ resource "google_sql_database_instance" "replicas" {
     }
 
     dynamic "data_cache_config" {
-      for_each = coalesce(each.value.edition, var.edition, "ENTERPRISE") == "ENTERPRISE_PLUS" && coalesce(each.value.data_cache_enabled, var.data_cache_enabled, false) ? ["cache_enabled"] : []
+      for_each = coalesce(each.value.edition, var.edition, "ENTERPRISE") == "ENTERPRISE_PLUS" ? ["cache_enabled"] : []
       content {
         data_cache_enabled = lookup(each.value, "data_cache_enabled", var.data_cache_enabled)
       }
