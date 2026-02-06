@@ -29,8 +29,9 @@ locals {
   users     = { for u in var.additional_users : u.name => u }
   iam_users = {
     for user in var.iam_users : user.id => {
-      email = trimsuffix(user.email, ".gserviceaccount.com")
-      type  = trimsuffix(user.email, "gserviceaccount.com") == user.email ? (user.type != null ? user.type : "CLOUD_IAM_USER") : "CLOUD_IAM_SERVICE_ACCOUNT"
+      email          = trimsuffix(user.email, ".gserviceaccount.com")
+      type           = trimsuffix(user.email, "gserviceaccount.com") == user.email ? (user.type != null ? user.type : "CLOUD_IAM_USER") : "CLOUD_IAM_SERVICE_ACCOUNT"
+      database_roles = lookup(user, "database_roles", null)
     }
   }
 
@@ -353,6 +354,7 @@ resource "google_sql_user" "default" {
   password            = var.user_password == "" ? random_password.user-password[0].result : var.user_password
   password_wo         = var.user_password == null ? var.user_password_wo : null
   password_wo_version = var.user_password == null ? var.user_password_wo_version : null
+  database_roles      = var.user_database_roles
   depends_on = [
     null_resource.module_depends_on,
     google_sql_database_instance.default,
@@ -362,11 +364,12 @@ resource "google_sql_user" "default" {
 }
 
 resource "google_sql_user" "additional_users" {
-  for_each = local.users
-  project  = var.project_id
-  name     = each.value.name
-  password = each.value.random_password ? random_password.additional_passwords[each.value.name].result : each.value.password
-  instance = google_sql_database_instance.default.name
+  for_each       = local.users
+  project        = var.project_id
+  name           = each.value.name
+  password       = each.value.random_password ? random_password.additional_passwords[each.value.name].result : each.value.password
+  instance       = google_sql_database_instance.default.name
+  database_roles = each.value.database_roles
   depends_on = [
     null_resource.module_depends_on,
     google_sql_database_instance.default,
@@ -378,11 +381,11 @@ resource "google_sql_user" "additional_users" {
 resource "google_sql_user" "iam_account" {
   for_each = local.iam_users
 
-  project  = var.project_id
-  name     = each.value.email
-  instance = google_sql_database_instance.default.name
-
-  type = each.value.type
+  project        = var.project_id
+  name           = each.value.email
+  instance       = google_sql_database_instance.default.name
+  type           = each.value.type
+  database_roles = each.value.database_roles
 
   depends_on = [
     null_resource.module_depends_on,

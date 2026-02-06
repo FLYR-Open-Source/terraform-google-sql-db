@@ -103,6 +103,12 @@ variable "user_password_wo_version" {
   default     = null
 }
 
+variable "user_database_roles" {
+  description = "A list of database roles to be assigned to the user. If not set, the default user will be assigned the cloudsqlsuperuser role. If set, the default user will be assigned the specified roles and not be assigned the cloudsqlsuperuser role."
+  type        = list(string)
+  default     = null
+}
+
 variable "root_password" {
   description = "Initial root password during creation"
   type        = string
@@ -162,6 +168,7 @@ variable "additional_users" {
     name            = string
     password        = string
     random_password = bool
+    database_roles  = optional(list(string))
   }))
   default = []
   validation {
@@ -478,9 +485,10 @@ variable "db_collation" {
 variable "iam_users" {
   description = "A list of IAM users to be created in your CloudSQL instance. iam.users.type can be CLOUD_IAM_USER, CLOUD_IAM_SERVICE_ACCOUNT, CLOUD_IAM_GROUP and is required for type CLOUD_IAM_GROUP (IAM groups)"
   type = list(object({
-    id    = string,
-    email = string,
-    type  = optional(string)
+    id             = string,
+    email          = string,
+    type           = optional(string)
+    database_roles = optional(list(string))
   }))
   default = []
 }
